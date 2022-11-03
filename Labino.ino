@@ -1,4 +1,5 @@
 #include "Sensors.h"
+#include "Credentials.h"
 
 ////////////// CONFIG //////////////
 
@@ -10,11 +11,9 @@ AnalogSensor sensors[] = {
 };
 const size_t nSensors = sizeof(sensors) / sizeof(AnalogSensor);
 
-#define READ_INTERVAL_MS 3000
-#define PRINT_INTERVAL_MS 9050
+uint32_t readInterval = 3000;
 
-const char* ssid = "Wifi-Casa";
-const char* password = "canotaje";
+#define DHT_PIN 27
 
 ////////////////////////////////////
 
@@ -29,6 +28,10 @@ const char* password = "canotaje";
 #include <ESPAsyncWebServer.h>
 
 AsyncWebServer server(80);
+
+#include <DHT.h>
+
+DHT dht(DHT_PIN, DHT22);
 
 void notFound(AsyncWebServerRequest *request) {
     request->send(404, "text/plain", "Not found");
@@ -55,18 +58,25 @@ void setup() {
     
     Serial.print("begin with "); Serial.print(nSensors); Serial.println(" Sensors");
 
+    dht.begin();
 
-    WiFi.mode(WIFI_STA);
-    WiFi.begin(ssid, password);
-    if (WiFi.waitForConnectResult() != WL_CONNECTED) {
-        Serial.println("WiFi Failed!");
-        return;
-    }
+//    WiFi.mode(WIFI_STA);
+//    WiFi.begin(ssid, password);
+//    if (WiFi.waitForConnectResult() != WL_CONNECTED) {
+//        Serial.println("WiFi Failed!");
+//        return;
+//    }
+//    Serial.print("IP Address: ");
+//    Serial.println(WiFi.localIP());
 
-    Serial.print("IP Address: ");
-    Serial.println(WiFi.localIP());
+    WiFi.mode(WIFI_AP);
+    WiFi.softAP(ssidAP, passwordAP);
+    Serial.println("WiFi AP created");
     
     server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
+        if (request->hasParam("readinterval")) {
+            readInterval = request->getParam("readinterval")->value().toInt();
+        }
         request->send_P(200, "text/html", index_html);
     });
 
@@ -99,6 +109,17 @@ void setup() {
         free(str);
     });
 
+    #define READ_INTERVAL_QUERYPARAM "readinterval"
+    #define MIN_READ_INTERVAL 2000
+    server.on("/config", HTTP_GET [](AsyncWebServerRequest *request){
+        if (request->hasParam(READ_INTERVAL_QUERYPARAM)) {
+            int newInterval = request->getParam(READ_INTERVAL_QUERYPARAM)->value().toInt();
+            if (newInterval > 0)
+                readInterval = max(newInterval, MIN_READ_INTERVAL);
+        }
+        request->redirect("/");
+    });
+
     server.onNotFound(notFound);
 
     server.begin();
@@ -106,15 +127,12 @@ void setup() {
 
 void loop() {
     static unsigned long lastReadTime = millis();
-    static unsigned long lastPrintInterval = millis();
 
-    if (abs(millis() - lastReadTime) > READ_INTERVAL_MS) {
-        SensorsSave(sensors, nSensors);
+    if (abs(millis() - lastReadTime) > readInterval) {
+        //SensorsSave(sensors, nSensors);
+        float hum = dht.readHumidity();
+        float temp = dht.readTemperature();
+        SensorsSaveAndDHT(sensors, nSensors, hum, temp);
         lastReadTime = millis();
-    }
-
-    if (abs(millis() - lastPrintInterval) > PRINT_INTERVAL_MS) {
-        ReadFile();
-        lastPrintInterval = millis();
     }
 }

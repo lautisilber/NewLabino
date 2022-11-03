@@ -3,6 +3,7 @@
 
 #include <Arduino.h>
 #include <ArduinoJson.h>
+#include <math.h>
 
 #include "FS.h"
 #ifdef ESP32
@@ -53,7 +54,18 @@ private:
 #define SENSOR_JSON_SIZE 64
 #define SAVE_FILENAME "/save.txt"
 
-void SensorsJson(JsonDocument &doc, AnalogSensor *sensors, size_t len, const char *fname=SAVE_FILENAME) {
+//inline float _Round(float f, int decs) {
+//    // only for positive numbers
+//    float mult = pow(10.0, (float)decs);
+//    int multiplied = (int)(f * mult + .5);
+//    float rounded = ((float)multiplied) / mult;
+//    if (f > 0 && rounded < 0) {
+//        return _Round(f, decs-1);
+//    }
+//    return rounded;
+//}
+
+void SensorsJson(JsonDocument &doc, AnalogSensor *sensors, size_t len) {
     const size_t keyLen = 16;
     for (size_t i = 0; i < len; i++) {
         char key[keyLen]{0};
@@ -63,11 +75,7 @@ void SensorsJson(JsonDocument &doc, AnalogSensor *sensors, size_t len, const cha
     }
 }
 
-bool SensorsSave(AnalogSensor *sensors, size_t len, const char *fname=SAVE_FILENAME) {
-    DynamicJsonDocument doc(SENSOR_JSON_SIZE * len);
-
-    SensorsJson(doc, sensors, len, fname);
-    
+bool _JsonToFile(JsonDocument &doc, const char *fname=SAVE_FILENAME){
     File file = FILE_SYSTEM.open(fname, FILE_APPEND);
     if(!file){
         Serial.println("Failed to open file for writing");
@@ -84,6 +92,26 @@ bool SensorsSave(AnalogSensor *sensors, size_t len, const char *fname=SAVE_FILEN
     
     file.close();
     return true;
+}
+
+bool SensorsSave(AnalogSensor *sensors, size_t len, const char *fname=SAVE_FILENAME) {
+    DynamicJsonDocument doc(SENSOR_JSON_SIZE * len);
+
+    SensorsJson(doc, sensors, len);
+    
+    return _JsonToFile(doc, fname);
+}
+
+bool SensorsSaveAndDHT(AnalogSensor *sensors, size_t len, float hum, float temp, const char *fname=SAVE_FILENAME) {
+    DynamicJsonDocument doc(SENSOR_JSON_SIZE * len + 128);
+
+    SensorsJson(doc, sensors, len);
+    //doc["hum"] = _Round(hum, 2);
+    //doc["temp"] = _Round(temp, 2);
+    doc["hum"] = hum;
+    doc["temp"] = temp;
+    
+    return _JsonToFile(doc, fname);
 }
 
 bool DeleteFile(const char *fname=SAVE_FILENAME) {

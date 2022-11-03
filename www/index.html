@@ -5,10 +5,71 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Labino</title>
+    <style>
+        :root {
+            --color-accent: #c2e7c2;
+        }
+
+        body {
+            background-color: #425F57;
+        }
+        .content {
+            width: fit-content;            
+            background-color: #749F82;
+            padding: 0.5rem 1rem;
+            padding-bottom: 1rem;
+            border-radius: 5px;
+            margin: 1rem;
+            margin-left:auto;
+            margin-right:auto;
+        }
+
+        a, button {
+            display: inline-block;
+            text-decoration: none;
+            color: black;
+            background-color: var(--color-accent);
+            border: 1px solid black;
+            border-radius: 4px;
+            padding: .2rem .3rem;
+            margin: .2rem .3rem;
+            transition: .15s;
+            cursor: pointer;
+        }
+
+        a:hover, button:hover {
+            filter: brightness(95%);
+        }
+
+        a:active, button:active {
+            filter: brightness(85%);
+        }
+
+        a#delete {
+            color: white;
+            background-color: crimson;
+        }
+
+        input {
+            background-color: var(--color-accent);
+        }
+    </style>
 </head>
 <body>
-    <a href="/download">Download</a>
-    <a href="/show">Show</a>
-    <a href="/delete">Delete</a>
+    <div class="content">
+        <h1>Labino</h1>
+        <a href="/download">Download</a><br>
+        <a href="/show">Show</a><br>
+        <a href="/delete" id="delete" onclick="return confirm('Seguro queres eliminar el archivo?')">Delete</a><br><br>
+
+        <form action="/config" method="get">
+            <fieldset>
+                <legend>Config</legend>
+                <label for="readinterval">Read interval (ms): </label>
+                <input type="number" name="readinterval" value="8" min="2000"><br>
+                <button type="submit">Set</button>
+            </fieldset>
+        </form>
+    </div>
 </body>
 </html>
