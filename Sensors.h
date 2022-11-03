@@ -3,7 +3,7 @@
 
 #include <Arduino.h>
 #include <ArduinoJson.h>
-#include <math.h>
+//#include <math.h>
 
 #include "FS.h"
 #ifdef ESP32
