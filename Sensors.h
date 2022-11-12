@@ -2,15 +2,22 @@
 #define _SENSORS_H
 
 #include <Arduino.h>
-#include "FS.h"
-#include <LITTLEFS.h>
 #include <ArduinoJson.h>
+//#include <math.h>
 
-#if !defined(SENS_TIME)
-#define SENS_AVG 50
+#include "FS.h"
+#ifdef ESP32
+    #include <LITTLEFS.h>
+    #define FILE_SYSTEM LITTLEFS
+#elif defined(ESP8266)
+    #include <LittleFS.h>
+    #define FILE_SYSTEM LittleFS
 #endif
 
-#define FS LITTLEFS
+
+#if !defined(SENS_AVG)
+#define SENS_AVG 50
+#endif
 
 
 class AnalogSensor {
@@ -44,12 +51,21 @@ private:
 };
 
 
-#define SENSOR_JSON_SIZE 16
+#define SENSOR_JSON_SIZE 64
 #define SAVE_FILENAME "/save.txt"
 
-bool SensorsSave(AnalogSensor *sensors, size_t len, const char *fname=SAVE_FILENAME) {
-    StaticJsonDocument <1024> doc;
+//inline float _Round(float f, int decs) {
+//    // only for positive numbers
+//    float mult = pow(10.0, (float)decs);
+//    int multiplied = (int)(f * mult + .5);
+//    float rounded = ((float)multiplied) / mult;
+//    if (f > 0 && rounded < 0) {
+//        return _Round(f, decs-1);
+//    }
+//    return rounded;
+//}
 
+void SensorsJson(JsonDocument &doc, AnalogSensor *sensors, size_t len) {
     const size_t keyLen = 16;
     for (size_t i = 0; i < len; i++) {
         char key[keyLen]{0};
@@ -57,8 +73,10 @@ bool SensorsSave(AnalogSensor *sensors, size_t len, const char *fname=SAVE_FILEN
         JsonObject sens = doc.createNestedObject(key);
         sens["val"] = sensors[i].read(false);
     }
-    
-    File file = FS.open(fname, FILE_APPEND);
+}
+
+bool _JsonToFile(JsonDocument &doc, const char *fname=SAVE_FILENAME){
+    File file = FILE_SYSTEM.open(fname, FILE_APPEND);
     if(!file){
         Serial.println("Failed to open file for writing");
         return false;
@@ -76,8 +94,28 @@ bool SensorsSave(AnalogSensor *sensors, size_t len, const char *fname=SAVE_FILEN
     return true;
 }
 
+bool SensorsSave(AnalogSensor *sensors, size_t len, const char *fname=SAVE_FILENAME) {
+    DynamicJsonDocument doc(SENSOR_JSON_SIZE * len);
+
+    SensorsJson(doc, sensors, len);
+    
+    return _JsonToFile(doc, fname);
+}
+
+bool SensorsSaveAndDHT(AnalogSensor *sensors, size_t len, float hum, float temp, const char *fname=SAVE_FILENAME) {
+    DynamicJsonDocument doc(SENSOR_JSON_SIZE * len + 128);
+
+    SensorsJson(doc, sensors, len);
+    //doc["hum"] = _Round(hum, 2);
+    //doc["temp"] = _Round(temp, 2);
+    doc["hum"] = hum;
+    doc["temp"] = temp;
+    
+    return _JsonToFile(doc, fname);
+}
+
 bool DeleteFile(const char *fname=SAVE_FILENAME) {
-    if(!FS.remove(fname)){
+    if(!FILE_SYSTEM.remove(fname)){
         Serial.println("File deletion failed");
         return false;
     }
@@ -85,15 +123,15 @@ bool DeleteFile(const char *fname=SAVE_FILENAME) {
 }
 
 bool BeginFS(bool format=false) {
-    if(!LITTLEFS.begin(format)){
-        Serial.println("LITTLEFS Mount Failed");
+    if(!FILE_SYSTEM.begin(format)){
+        Serial.println("FS Mount Failed");
         return false;
     }
     return true;
 }
 
 void ReadFile(const char *fname=SAVE_FILENAME) {
-    File file = FS.open(fname);
+    File file = FILE_SYSTEM.open(fname);
     if(!file || file.isDirectory()){
         Serial.println("Failed to open file for reading");
         return;
